@@ -7,6 +7,16 @@ from pydantic import Field
 
 import mcp.types as types
 
+# ===============================================================
+# Shak db imports: --starts
+import os, json, urllib.parse
+import httpx
+from pydantic import Field
+from mcp.server.fastmcp import FastMCP
+
+# Shak db imports: --ends
+# ===============================================================
+
 mcp = FastMCP("Echo Server", port=3000, stateless_http=True, debug=True)
 
 
@@ -42,6 +52,76 @@ def greet_user(
     }
 
     return f"{styles.get(style, styles['friendly'])} for someone named {name}."
+
+
+# ===============================================================
+# ---Shak : Supabase REST config (env-driven) ---starts
+# ===============================================================
+SUPABASE_URL = os.environ["SUPABASE_URL"].rstrip("/")
+SUPABASE_KEY = os.environ["SUPABASE_SERVICE_ROLE"]  # server-side only
+REST_BASE = f"{SUPABASE_URL}/rest/v1"
+HEADERS = {
+    "apikey": SUPABASE_KEY,
+    "Authorization": f"Bearer {SUPABASE_KEY}",
+    "Content-Type": "application/json",
+    "Accept": "application/json",
+    "Prefer": "count=exact",  # gives total in Content-Range
+}
+
+def _encode_filters(params: dict) -> dict:
+    """Convert {'col':'val'} -> {'col':'eq.val'} for PostgREST."""
+    out = {}
+    for k, v in params.items():
+        if isinstance(v, bool):
+            v = "true" if v else "false"
+        out[k] = f"eq.{v}"
+    return out
+
+@mcp.tool(
+    title="Read Supabase Table",
+    description="Read rows from a Supabase Postgres table via PostgREST with equality filters, ordering, and pagination.",
+)
+async def read_supabase_table(
+    table: str = Field(description="Table name, e.g., 'public.kaggle_data' or 'kaggle_data'"),
+    select_cols: str = Field(description="Columns to select, e.g., '*', 'id,name'", default="*"),
+    filters_json: str = Field(description='Equality filters as JSON, e.g., {"country":"FR"}', default="{}"),
+    order_by: str = Field(description="Column to order by (optional)", default=""),
+    ascending: bool = Field(description="Ascending sort if true", default=True),
+    limit: int = Field(description="Max rows (default 100)", default=100),
+    offset: int = Field(description="Offset (default 0)", default=0),
+) -> str:
+    """
+    Returns: JSON string: {"rows":[...], "count": <int or null>}
+    """
+    try:
+        tbl = table.split(".", 1)[-1]  # strip schema if passed
+        params = {
+            "select": select_cols,
+            "limit": str(max(1, limit)),
+            "offset": str(max(0, offset)),
+        }
+        if order_by:
+            params["order"] = f"{order_by}.{ 'asc' if ascending else 'desc' }"
+
+        # add equality filters
+        filters = json.loads(filters_json or "{}")
+        params.update(_encode_filters(filters))
+
+        url = f"{REST_BASE}/{urllib.parse.quote(tbl, safe='')}"
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.get(url, params=params, headers=HEADERS)
+        resp.raise_for_status()
+
+        rows = resp.json()
+        cr = resp.headers.get("content-range")  # e.g., "0-9/123"
+        count = int(cr.split("/")[-1]) if cr and "/" in cr and cr.split("/")[-1].isdigit() else None
+        return json.dumps({"rows": rows, "count": count})
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+# ===============================================================
+# ---Shak : Supabase REST config (env-driven) ---ends
+# ===============================================================
 
 
 if __name__ == "__main__":
