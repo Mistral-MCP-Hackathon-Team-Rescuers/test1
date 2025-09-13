@@ -14,6 +14,9 @@ import httpx
 from pydantic import Field
 from mcp.server.fastmcp import FastMCP
 
+from dotenv import load_dotenv
+load_dotenv()  # will read .env file if present
+
 # Shak db imports: --ends
 # ===============================================================
 

@@ -195,6 +195,7 @@ dependencies = [
     { name = "black" },
     { name = "httpx" },
     { name = "mcp" },
+    { name = "python-dotenv" },
 ]
 
 [package.metadata]
@@ -202,6 +203,7 @@ requires-dist = [
     { name = "black", specifier = ">=25.1.0" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "mcp" },
+    { name = "python-dotenv", specifier = ">=1.1.1" },
 ]
 
 [[package]]

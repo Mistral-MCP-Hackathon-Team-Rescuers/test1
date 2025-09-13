@@ -10,4 +10,5 @@ dependencies = [
     "black>=25.1.0",
     "httpx>=0.28.1",
     "mcp",
+    "python-dotenv>=1.1.1",
 ]
