@@ -12,15 +12,23 @@ import mcp.types as types
 import os, json, urllib.parse
 import httpx
 from pydantic import Field
-from mcp.server.fastmcp import FastMCP
+
 
 from dotenv import load_dotenv
 load_dotenv()  # will read .env file if present
+PORT = int(os.getenv("PORT", 3000))
 
+from mcp.server.fastmcp import FastMCP
 # Shak db imports: --ends
 # ===============================================================
 
-mcp = FastMCP("Echo Server", port=3000, stateless_http=True, debug=True)
+mcp = FastMCP(
+    "Echo Server", 
+    port=PORT,
+    host="0.0.0.0",
+    stateless_http=True, 
+    debug=True,
+    )
 
 
 @mcp.tool(
